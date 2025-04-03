@@ -74,7 +74,8 @@ class LCUser extends LCObject {
   }
 
   /// Requests a login sms code to be sent to the [mobile] number of an existing user.
-  static Future requestLoginSMSCode(String mobile, {String? validateToken}) async {
+  static Future requestLoginSMSCode(String mobile,
+      {String? validateToken}) async {
     if (isNullOrEmpty(mobile)) {
       throw ArgumentError.notNull('mobile');
     }
@@ -86,14 +87,17 @@ class LCUser extends LCObject {
   }
 
   /// Signs up or signs in a [LCUser] with their [mobile] number and verification [code].
-  static Future<LCUser> signUpOrLoginByMobilePhone(String mobile, String code) async {
+  static Future<LCUser> signUpOrLoginByMobilePhone(
+      String mobile, String code) async {
     if (isNullOrEmpty(mobile)) {
       throw ArgumentError.notNull('mobile');
     }
     if (isNullOrEmpty(code)) {
       throw ArgumentError.notNull('code');
     }
-    Map<String, dynamic> response = await LeanCloud._httpClient.post('usersByMobilePhone', data: {'mobilePhoneNumber': mobile, 'smsCode': code});
+    Map<String, dynamic> response = await LeanCloud._httpClient.post(
+        'usersByMobilePhone',
+        data: {'mobilePhoneNumber': mobile, 'smsCode': code});
     _LCObjectData objectData = _LCObjectData.decode(response);
     _currentUser = LCUser._fromObjectData(objectData);
     await _saveToLocal();
@@ -125,14 +129,18 @@ class LCUser extends LCObject {
   }
 
   /// Signs in a user with their [mobile] number and [password].
-  static Future<LCUser> loginByMobilePhoneNumber(String mobile, String password) {
+  static Future<LCUser> loginByMobilePhoneNumber(
+      String mobile, String password) {
     if (isNullOrEmpty(mobile)) {
       throw ArgumentError.notNull('mobile');
     }
     if (isNullOrEmpty(password)) {
       throw ArgumentError.notNull('password');
     }
-    Map<String, dynamic> data = {'mobilePhoneNumber': mobile, 'password': password};
+    Map<String, dynamic> data = {
+      'mobilePhoneNumber': mobile,
+      'password': password
+    };
     return _login(data);
   }
 
@@ -149,7 +157,9 @@ class LCUser extends LCObject {
   }
 
   /// Signs up or signs in a user with third party [authData].
-  static Future<LCUser> loginWithAuthData(Map<String, dynamic> authData, String platform, {LCUserAuthDataLoginOption? option}) {
+  static Future<LCUser> loginWithAuthData(
+      Map<String, dynamic> authData, String platform,
+      {LCUserAuthDataLoginOption? option}) {
     if (isNullOrEmpty(platform)) {
       throw ArgumentError.notNull('platform');
     }
@@ -160,7 +170,9 @@ class LCUser extends LCObject {
   }
 
   /// Signs up or signs in a user with third party [authData] and [unionId].
-  static Future<LCUser> loginWithAuthDataAndUnionId(Map<String, dynamic> authData, String platform, String unionId, {LCUserAuthDataLoginOption? option}) {
+  static Future<LCUser> loginWithAuthDataAndUnionId(
+      Map<String, dynamic> authData, String platform, String unionId,
+      {LCUserAuthDataLoginOption? option}) {
     if (isNullOrEmpty(platform)) {
       throw ArgumentError.notNull('platform');
     }
@@ -174,17 +186,20 @@ class LCUser extends LCObject {
     return _loginWithAuthData(platform, authData, option.failOnNotExist);
   }
 
-  static Future<LCUser> _loginWithAuthData(String authType, Map<String, dynamic> data, bool failOnNotExist) async {
+  static Future<LCUser> _loginWithAuthData(
+      String authType, Map<String, dynamic> data, bool failOnNotExist) async {
     Map<String, dynamic> authData = {authType: data};
     String path = failOnNotExist ? 'users?failOnNotExist=true' : 'users';
-    Map<String, dynamic> response = await LeanCloud._httpClient.post(path, data: {'authData': authData});
+    Map<String, dynamic> response =
+        await LeanCloud._httpClient.post(path, data: {'authData': authData});
     _LCObjectData objectData = _LCObjectData.decode(response);
     _currentUser = LCUser._fromObjectData(objectData);
     await _saveToLocal();
     return _currentUser!;
   }
 
-  static void _mergeAuthData(Map<String, dynamic> authData, String unionId, LCUserAuthDataLoginOption option) {
+  static void _mergeAuthData(Map<String, dynamic> authData, String unionId,
+      LCUserAuthDataLoginOption option) {
     authData['platform'] = option.unionIdPlatform;
     authData['main_account'] = option.asMainAccount;
     authData['unionid'] = unionId;
@@ -196,7 +211,9 @@ class LCUser extends LCObject {
   }
 
   /// Associates this user with a third party [authData] and [unionId].
-  Future associateAuthDataAndUnionId(Map<String, dynamic> authData, String platform, String unionId, {LCUserAuthDataLoginOption? option}) {
+  Future associateAuthDataAndUnionId(
+      Map<String, dynamic> authData, String platform, String unionId,
+      {LCUserAuthDataLoginOption? option}) {
     if (isNullOrEmpty(platform)) {
       throw ArgumentError.notNull('platform');
     }
@@ -295,7 +312,8 @@ class LCUser extends LCObject {
       throw ArgumentError.notNull('sessionToken');
     }
     Map<String, String> headers = {'X-LC-Session': sessionToken};
-    Map<String, dynamic> response = await LeanCloud._httpClient.get('users/me', headers: headers);
+    Map<String, dynamic> response =
+        await LeanCloud._httpClient.get('users/me', headers: headers);
     _LCObjectData objectData = _LCObjectData.decode(response);
     _currentUser = LCUser._fromObjectData(objectData);
     await _saveToLocal();
@@ -307,7 +325,8 @@ class LCUser extends LCObject {
     if (isNullOrEmpty(email)) {
       throw ArgumentError.notNull('email');
     }
-    await LeanCloud._httpClient.post('requestPasswordReset', data: {'email': email});
+    await LeanCloud._httpClient
+        .post('requestPasswordReset', data: {'email': email});
   }
 
   /// Requests a reset password sms code to be sent to a user's [mobile] number.
@@ -315,11 +334,13 @@ class LCUser extends LCObject {
     if (isNullOrEmpty(mobile)) {
       throw ArgumentError.notNull('mobile');
     }
-    await LeanCloud._httpClient.post('requestPasswordResetBySmsCode', data: {'mobilePhoneNumber': mobile});
+    await LeanCloud._httpClient.post('requestPasswordResetBySmsCode',
+        data: {'mobilePhoneNumber': mobile});
   }
 
   /// Resets a user's password via [mobile] phone.
-  static Future resetPasswordBySmsCode(String mobile, String code, String newPassword) async {
+  static Future resetPasswordBySmsCode(
+      String mobile, String code, String newPassword) async {
     if (isNullOrEmpty(mobile)) {
       throw ArgumentError.notNull('mobile');
     }
@@ -329,7 +350,8 @@ class LCUser extends LCObject {
     if (isNullOrEmpty(newPassword)) {
       throw ArgumentError.notNull('newPassword');
     }
-    await LeanCloud._httpClient.put('resetPasswordBySmsCode/$code', data: {'mobilePhoneNumber': mobile, 'password': newPassword});
+    await LeanCloud._httpClient.put('resetPasswordBySmsCode/$code',
+        data: {'mobilePhoneNumber': mobile, 'password': newPassword});
   }
 
   /// Updates [newPassword] safely with [oldPassword].
@@ -340,7 +362,9 @@ class LCUser extends LCObject {
     if (isNullOrEmpty(newPassword)) {
       throw ArgumentError.notNull('newPassword');
     }
-    Map<String, dynamic> response = await LeanCloud._httpClient.put('users/$objectId/updatePassword', data: {'old_password': oldPassword, 'new_password': newPassword});
+    Map<String, dynamic> response = await LeanCloud._httpClient.put(
+        'users/$objectId/updatePassword',
+        data: {'old_password': oldPassword, 'new_password': newPassword});
     _LCObjectData objectData = _LCObjectData.decode(response);
     _merge(objectData);
   }
@@ -373,7 +397,8 @@ class LCUser extends LCObject {
   bool get isAnonymous => authData?['anonymous'] != null;
 
   static Future<LCUser> _login(Map<String, dynamic> data) async {
-    Map<String, dynamic> response = await LeanCloud._httpClient.post('login', data: data);
+    Map<String, dynamic> response =
+        await LeanCloud._httpClient.post('login', data: data);
     _LCObjectData objectData = _LCObjectData.decode(response);
     _currentUser = LCUser._fromObjectData(objectData);
     await _saveToLocal();
@@ -432,14 +457,6 @@ class LCUser extends LCObject {
     await LeanCloud._httpClient.delete(path);
   }
 
-  Future removeFans(String targetId, String userId) async {
-    if (isNullOrEmpty(targetId)) {
-      throw ArgumentError.notNull('targetId');
-    }
-    String path = 'users/$userId/friendship/$targetId';
-    await LeanCloud._httpClient.delete(path);
-  }
-
   /// Constructs a follower query.
   LCQuery<LCObject> followerQuery() {
     LCQuery<LCObject> query = new LCQuery('_Follower');
@@ -459,7 +476,10 @@ class LCUser extends LCObject {
   /// Queries followers and followees at the same time.
   ///
   /// [returnCount] indicates whether to return followers/followees count.
-  Future<LCFollowersAndFollowees> getFollowersAndFollowees({bool includeFollower = false, bool includeFollowee = false, bool returnCount = false}) async {
+  Future<LCFollowersAndFollowees> getFollowersAndFollowees(
+      {bool includeFollower = false,
+      bool includeFollowee = false,
+      bool returnCount = false}) async {
     Map<String, dynamic> queryParams = {};
     if (returnCount) {
       queryParams['count'] = 1;
@@ -474,7 +494,8 @@ class LCUser extends LCObject {
       }
       queryParams['include'] = includes.join(',');
     }
-    Map response = await LeanCloud._httpClient.get('users/$objectId/followersAndFollowees', queryParams: queryParams);
+    Map response = await LeanCloud._httpClient
+        .get('users/$objectId/followersAndFollowees', queryParams: queryParams);
     LCFollowersAndFollowees result = new LCFollowersAndFollowees();
     if (response.containsKey('followers')) {
       result.followers = <LCObject>[];
@@ -504,7 +525,8 @@ class LCUser extends LCObject {
   }
 
   /// Requests an SMS code for updating phone number.
-  static Future requestSMSCodeForUpdatingPhoneNumber(String mobile, {int ttl = 360, String? captchaToken}) async {
+  static Future requestSMSCodeForUpdatingPhoneNumber(String mobile,
+      {int ttl = 360, String? captchaToken}) async {
     String path = 'requestChangePhoneNumber';
     Map<String, dynamic> data = {'mobilePhoneNumber': mobile, 'ttl': ttl};
     if (captchaToken != null) {
@@ -514,14 +536,16 @@ class LCUser extends LCObject {
   }
 
   /// Verify code for updating phone number.
-  static Future verifyCodeForUpdatingPhoneNumber(String mobile, String code) async {
+  static Future verifyCodeForUpdatingPhoneNumber(
+      String mobile, String code) async {
     String path = 'changePhoneNumber';
     Map<String, dynamic> data = {'mobilePhoneNumber': mobile, 'code': code};
     await LeanCloud._httpClient.post(path, data: data);
   }
 
   @override
-  Future<LCUser> save({bool fetchWhenSave = false, LCQuery<LCObject>? query}) async {
+  Future<LCUser> save(
+      {bool fetchWhenSave = false, LCQuery<LCObject>? query}) async {
     await super.save(fetchWhenSave: fetchWhenSave, query: query);
     _currentUser = this;
     await _saveToLocal();
