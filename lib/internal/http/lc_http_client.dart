@@ -150,8 +150,8 @@ class _LCHttpClient {
     return headers;
   }
 
-  void _handleError(DioError e) {
-    if (e.type != DioErrorType.response) {
+  void _handleError(DioException e) {
+    if (e.type != DioExceptionType.badResponse) {
       throw e;
     }
     Response? response = e.response;

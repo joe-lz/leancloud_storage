@@ -9,13 +9,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  dio: ^4.0.0
+  dio: ^5.8.0+1
   convert: ^3.0.0
   crypto: ^3.0.1
   shared_preferences: ^2.0.5
-  dio_http_cache: ^0.3.0
+  dio_http_cache: 
+    path: ../dio-http-cache
   path: ^1.8.0
-  qiniu_flutter_sdk: ^0.3.0
+  qiniu_flutter_sdk: ^0.7.1
   path_provider: ^2.0.4
 
 dev_dependencies:
