@@ -1,0 +1,13 @@
+{
+  "editor.formatOnSave": true,
+  "editor.wordWrap": "wordWrapColumn",
+  "editor.wordWrapColumn": 200,
+  "dart.lineLength": 200,
+  "git.postCommitCommand": "push",
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "always",
+    "source.organizeImports": "always"
+  },
+  "chat.editing.autoAcceptDelay": 60
+  // "dart.flutterSdkPath": ".fvm/versions/3.27.4"
+}
