@@ -12,16 +12,14 @@ class LCStatusQuery extends LCQuery<LCStatus> {
   late int maxId;
 
   /// Constructs a [LCQuery] for [LCStatus].
-  LCStatusQuery({String inboxType = LCStatus.InboxTypeDefault})
-      : super('_Status') {
+  LCStatusQuery({String inboxType = LCStatus.InboxTypeDefault}) : super('_Status') {
     this.inboxType = inboxType;
     this.sinceId = 0;
     this.maxId = 0;
   }
 
   /// See [LCQuery.find].
-  Future<List<LCStatus>> find(
-      {CachePolicy cachePolicy = CachePolicy.onlyNetwork}) async {
+  Future<List<LCStatus>> find({CachePolicy cachePolicy = CachePolicy.onlyNetwork}) async {
     LCUser? user = await LCUser.getCurrent();
     if (user == null) {
       throw new ArgumentError.notNull('current user');
@@ -43,9 +41,85 @@ class LCStatusQuery extends LCQuery<LCStatus> {
     if (keys != null) {
       params['keys'] = keys;
     }
-    Map response = await LeanCloud._httpClient
-        .get('subscribe/statuses', queryParams: params);
+
+    // 如果有查询缓存，尝试使用缓存策略
+    if (LeanCloud._queryCache != null && cachePolicy != CachePolicy.onlyNetwork) {
+      return await _findWithCache(params, cachePolicy);
+    }
+
+    // 默认网络查询
+    Map response = await LeanCloud._httpClient.get('subscribe/statuses', queryParams: params);
+    return _parseStatusResults(response);
+  }
+
+  Future<List<LCStatus>> _findWithCache(Map<String, dynamic> params, CachePolicy cachePolicy) async {
+    final cache = LeanCloud._queryCache!;
+    final cacheKey = cache.generateCacheKey('_Status', params);
+
+    switch (cachePolicy) {
+      case CachePolicy.onlyCache:
+        final cachedData = cache.getCachedResult(cacheKey);
+        if (cachedData != null) {
+          return _parseStatusResultsFromCache(cachedData);
+        }
+        throw LCException(404, 'No cached data available for status query');
+
+      case CachePolicy.cacheElseNetwork:
+        if (cache.hasCachedResult(cacheKey)) {
+          final cachedData = cache.getCachedResult(cacheKey);
+          return _parseStatusResultsFromCache(cachedData);
+        }
+        return await _fetchStatusFromNetworkAndCache(params, cacheKey, cache);
+
+      case CachePolicy.cacheFirst:
+        if (cache.hasCachedResult(cacheKey)) {
+          final cachedData = cache.getCachedResult(cacheKey);
+          return _parseStatusResultsFromCache(cachedData);
+        }
+        return await _fetchStatusFromNetworkAndCache(params, cacheKey, cache);
+
+      case CachePolicy.networkElseCache:
+        try {
+          return await _fetchStatusFromNetworkAndCache(params, cacheKey, cache);
+        } catch (error) {
+          if (cache.hasCachedResult(cacheKey)) {
+            final cachedData = cache.getCachedResult(cacheKey);
+            return _parseStatusResultsFromCache(cachedData);
+          }
+          rethrow;
+        }
+
+      default:
+        return await _fetchStatusFromNetworkAndCache(params, cacheKey, cache);
+    }
+  }
+
+  Future<List<LCStatus>> _fetchStatusFromNetworkAndCache(Map<String, dynamic> params, String cacheKey, LCQueryCache cache) async {
+    Map response = await LeanCloud._httpClient.get('subscribe/statuses', queryParams: params);
+
+    // 缓存结果
+    cache.cacheResult(cacheKey, response['results']);
+
+    return _parseStatusResults(response);
+  }
+
+  List<LCStatus> _parseStatusResults(Map response) {
     List results = response['results'];
+    List<LCStatus> list = [];
+    results.forEach((item) {
+      _LCObjectData objectData = _LCObjectData.decode(item);
+      LCStatus status = new LCStatus();
+      status._merge(objectData);
+      status.messageId = objectData.customPropertyMap[LCStatus.MessageIdKey];
+      status.data = objectData.customPropertyMap;
+      status.inboxType = objectData.customPropertyMap[LCStatus.InboxTypeKey];
+      list.add(status);
+    });
+    return list;
+  }
+
+  List<LCStatus> _parseStatusResultsFromCache(dynamic cachedData) {
+    List results = cachedData as List;
     List<LCStatus> list = [];
     results.forEach((item) {
       _LCObjectData objectData = _LCObjectData.decode(item);

@@ -84,25 +84,21 @@ class LCQuery<T extends LCObject> {
     return this;
   }
 
-  LCQuery<T> whereWithinGeoBox(
-      String key, LCGeoPoint southwest, LCGeoPoint northeast) {
+  LCQuery<T> whereWithinGeoBox(String key, LCGeoPoint southwest, LCGeoPoint northeast) {
     condition.whereWithinGeoBox(key, southwest, northeast);
     return this;
   }
 
-  LCQuery<T> whereWithinRadians(
-      String key, LCGeoPoint point, double maxDistance) {
+  LCQuery<T> whereWithinRadians(String key, LCGeoPoint point, double maxDistance) {
     condition.whereWithinRadians(key, point, maxDistance);
     return this;
   }
 
-  LCQuery<T> whereWithinMiles(
-      String key, LCGeoPoint point, double maxDistance) {
+  LCQuery<T> whereWithinMiles(String key, LCGeoPoint point, double maxDistance) {
     return whereWithinRadians(key, point, maxDistance / 3958.8);
   }
 
-  LCQuery<T> whereWithinKilometers(
-      String key, LCGeoPoint point, double maxDistance) {
+  LCQuery<T> whereWithinKilometers(String key, LCGeoPoint point, double maxDistance) {
     return whereWithinRadians(key, point, maxDistance / 6371.0);
   }
 
@@ -226,25 +222,118 @@ class LCQuery<T extends LCObject> {
     if (includes != null) {
       queryParams = {"include": includes};
     }
-    Map<String, dynamic> response =
-        await LeanCloud._httpClient.get(path, queryParams: queryParams);
+    Map<String, dynamic> response = await LeanCloud._httpClient.get(path, queryParams: queryParams);
     return _decodeLCObject(response);
   }
 
   /// Retrieves a list of [LCObject]s matching this query, respecting [cachePolicy].
-  Future<List<T>?> find(
-      {CachePolicy cachePolicy = CachePolicy.onlyNetwork}) async {
+  Future<List<T>?> find({CachePolicy cachePolicy = CachePolicy.onlyNetwork}) async {
     return _fetch(cachePolicy);
   }
 
   Future<List<T>> _fetch(CachePolicy cachePolicy) async {
     String path = 'classes/$className';
     Map<String, dynamic> params = _buildParams();
-    Map response = await LeanCloud._httpClient.get(path,
-        queryParams: params,
-        maxCacheAge: maxCacheAge,
-        cachePolicy: cachePolicy);
+
+    // 如果有查询缓存，尝试使用缓存策略
+    if (LeanCloud._queryCache != null) {
+      return await _fetchWithCache(path, params, cachePolicy);
+    }
+
+    // 默认网络查询
+    Map response = await LeanCloud._httpClient.get(path, queryParams: params, maxCacheAge: maxCacheAge, cachePolicy: cachePolicy);
     List results = response['results'];
+    List<T> list = [];
+    results.forEach((item) {
+      T object = _decodeLCObject(item);
+      list.add(object);
+    });
+    return list;
+  }
+
+  Future<List<T>> _fetchWithCache(String path, Map<String, dynamic> params, CachePolicy cachePolicy) async {
+    final cache = LeanCloud._queryCache!;
+    final cacheKey = cache.generateCacheKey(className!, params);
+
+    switch (cachePolicy) {
+      case CachePolicy.onlyCache:
+        // 仅使用缓存
+        final cachedData = cache.getCachedResult(cacheKey);
+        if (cachedData != null) {
+          return _parseResultsFromCache(cachedData);
+        }
+        throw LCException(404, 'No cached data available');
+
+      case CachePolicy.cacheElseNetwork:
+        // 优先使用缓存，缓存未命中时查询网络
+        if (cache.hasCachedResult(cacheKey)) {
+          final cachedData = cache.getCachedResult(cacheKey);
+          return _parseResultsFromCache(cachedData);
+        }
+        // 缓存未命中，查询网络并缓存结果
+        return await _fetchFromNetworkAndCache(path, params, cacheKey, cache);
+
+      case CachePolicy.cacheFirst:
+        // 智能缓存优先（考虑过期时间）
+        if (cache.hasCachedResult(cacheKey)) {
+          final cachedData = cache.getCachedResult(cacheKey);
+          return _parseResultsFromCache(cachedData);
+        }
+        return await _fetchFromNetworkAndCache(path, params, cacheKey, cache);
+
+      case CachePolicy.cacheAndNetwork:
+        // 缓存和网络并行
+        List<T>? cachedResults;
+        if (cache.hasCachedResult(cacheKey)) {
+          final cachedData = cache.getCachedResult(cacheKey);
+          cachedResults = _parseResultsFromCache(cachedData);
+        }
+
+        // 异步更新网络数据
+        _fetchFromNetworkAndCache(path, params, cacheKey, cache).then((networkResults) {
+          // 网络数据获取成功，可以触发回调通知UI更新
+        }).catchError((error) {
+          // 网络请求失败，但缓存数据仍然有效
+        });
+
+        if (cachedResults != null) {
+          return cachedResults;
+        }
+        // 如果没有缓存，等待网络请求
+        return await _fetchFromNetworkAndCache(path, params, cacheKey, cache);
+
+      default:
+        // 默认策略：networkElseCache 或 onlyNetwork
+        return await _fetchFromNetworkAndCache(path, params, cacheKey, cache);
+    }
+  }
+
+  Future<List<T>> _fetchFromNetworkAndCache(String path, Map<String, dynamic> params, String cacheKey, LCQueryCache cache) async {
+    try {
+      Map response = await LeanCloud._httpClient.get(path, queryParams: params, maxCacheAge: maxCacheAge);
+
+      // 缓存结果
+      cache.cacheResult(cacheKey, response['results']);
+
+      List results = response['results'];
+      List<T> list = [];
+      results.forEach((item) {
+        T object = _decodeLCObject(item);
+        list.add(object);
+      });
+      return list;
+    } catch (error) {
+      // 网络请求失败，尝试使用缓存
+      if (cache.hasCachedResult(cacheKey)) {
+        final cachedData = cache.getCachedResult(cacheKey);
+        return _parseResultsFromCache(cachedData);
+      }
+      rethrow;
+    }
+  }
+
+  List<T> _parseResultsFromCache(dynamic cachedData) {
+    List results = cachedData as List;
     List<T> list = [];
     results.forEach((item) {
       T object = _decodeLCObject(item);
@@ -284,8 +373,7 @@ class LCQuery<T extends LCObject> {
       throw new ArgumentError.notNull('queries');
     }
     LCQuery<T> compositionQuery = new LCQuery<T>(null);
-    compositionQuery.condition = new _LCCompositionalCondition(
-        composition: _LCCompositionalCondition.Or);
+    compositionQuery.condition = new _LCCompositionalCondition(composition: _LCCompositionalCondition.Or);
     String? className;
     queries.forEach((item) {
       if (className != null && className != item.className) {

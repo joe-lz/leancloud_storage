@@ -1,3 +1,30 @@
+## 🎉 完整的缓存系统修改总结
+1. 扩展了 CachePolicy 枚举 (lc_query_cache.dart)
+添加了 4 种新的缓存策略：
+
+✅ onlyCache - 仅使用缓存
+✅ cacheElseNetwork - 优先使用缓存（缓存未命中时查询网络）
+✅ cacheFirst - 智能缓存优先（考虑过期时间）
+✅ cacheAndNetwork - 缓存和网络并行
+2. 完善了 LCQueryCache 类 (lc_query_cache.dart)
+✅ 内存缓存存储
+✅ 缓存过期检查和自动清理
+✅ TTL（生存时间）控制（默认5分钟）
+✅ 缓存键生成算法
+✅ 完整的缓存管理 API
+3. 更新了 LeanCloud 类 (leancloud.dart)
+✅ 添加了 _queryCache 静态属性
+✅ 在初始化时存储缓存实例
+4. 增强了 LCQuery 类 (lc_query.dart)
+✅ 支持所有新的缓存策略
+✅ 智能缓存逻辑实现
+✅ 网络失败时自动回退到缓存
+✅ 缓存和网络并行查询
+5. 更新了 LCStatusQuery 类 (lc_status_query.dart)
+✅ 继承所有缓存策略功能
+✅ 专门的状态查询缓存处理
+
+
 ## [0.7.10] - 版本更新
 
 - 修复大写文件名后缀无法被识别的 bug

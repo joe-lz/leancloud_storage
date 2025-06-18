@@ -34,7 +34,7 @@ import 'package:leancloud_storage/leancloud.dart';
 LeanCloud.initialize(
   APP_ID, APP_KEY,
   server: APP_SERVER, // to use your own custom domain
-  queryCache: new LCQueryCache() // optinoal, enable cache
+  queryCache: new LCQueryCache() // optional, enable query cache
 );
 ```
 
@@ -64,6 +64,114 @@ query.limit(limit);
 List<LCObject> list = await query.find();
 ```
 
+### Query Cache
+
+The SDK supports multiple cache policies to optimize performance:
+
+#### Basic Usage
+
+```dart
+// Initialize with cache support
+LeanCloud.initialize(
+  APP_ID, APP_KEY,
+  server: APP_SERVER,
+  queryCache: new LCQueryCache()
+);
+
+// Use cache-first strategy (recommended)
+LCQuery<LCObject> query = new LCQuery<LCObject>('Hello');
+List<LCObject> list = await query.find(
+  cachePolicy: CachePolicy.cacheElseNetwork
+);
+```
+
+#### Cache Policies
+
+1. **CachePolicy.onlyNetwork** (默认)
+   - Always queries from the cloud
+   - No cache involved
+
+2. **CachePolicy.networkElseCache** 
+   - Queries from cloud first, fallback to cache if failed
+   - Good for ensuring fresh data with offline fallback
+
+3. **CachePolicy.onlyCache**
+   - Always queries from cache only
+   - Throws exception if no cached data available
+
+4. **CachePolicy.cacheElseNetwork** ⭐ (推荐优先使用缓存)
+   - Queries from cache first, queries cloud if cache miss
+   - Best for performance with fresh data when needed
+
+5. **CachePolicy.cacheFirst**
+   - Queries from cache if available and not expired
+   - Automatically queries cloud for expired cache
+
+6. **CachePolicy.cacheAndNetwork**
+   - Returns cache immediately and updates with network response
+   - Best for instant UI updates
+
+#### Advanced Examples
+
+```dart
+// Cache-first strategy (recommended for most cases)
+LCQuery<LCObject> query = new LCQuery<LCObject>('User');
+query.whereEqualTo('city', 'Beijing');
+List<LCObject> users = await query.find(
+  cachePolicy: CachePolicy.cacheElseNetwork
+);
+
+// Only use cache (offline mode)
+try {
+  List<LCObject> cachedUsers = await query.find(
+    cachePolicy: CachePolicy.onlyCache
+  );
+} catch (e) {
+  print('No cached data available');
+}
+
+// Network with cache fallback
+List<LCObject> reliableUsers = await query.find(
+  cachePolicy: CachePolicy.networkElseCache
+);
+
+// Smart cache (respects expiration)
+List<LCObject> freshUsers = await query.find(
+  cachePolicy: CachePolicy.cacheFirst
+);
+```
+
+#### Cache Management
+
+```dart
+// Clear all cache
+await LeanCloud.clearAllCache();
+
+// Manual cache control (if needed)
+LCQueryCache cache = new LCQueryCache();
+String cacheKey = cache.generateCacheKey('User', queryParams);
+
+// Check if cache exists
+if (cache.hasCachedResult(cacheKey)) {
+  var data = cache.getCachedResult(cacheKey);
+}
+
+// Cache custom data with TTL
+cache.cacheResult(cacheKey, data, ttlSeconds: 600); // 10 minutes
+
+// Clear specific cache
+cache.clearCache(cacheKey);
+```
+
+#### Cache Features
+
+- **🚀 High Performance**: Memory-based caching for fast access
+- **⏰ TTL Support**: Configurable expiration time (default: 5 minutes)
+- **🔄 Auto Cleanup**: Expired cache automatically removed
+- **📱 Offline Support**: Works seamlessly in offline scenarios
+- **🎯 Smart Policies**: Multiple strategies for different use cases
+- **💾 Memory Efficient**: Intelligent memory management
+
 ### Files
 
 ```dart
@@ -90,6 +198,14 @@ LCGeoPoint p1 = new LCGeoPoint(20.0059, 110.3665);
 
 ## More
 
+### Documentation
+
+- **📖 [Query Cache API Documentation](CACHE_API.md)** - Complete cache API reference
+- **🚀 [Quick Start Example](example/quick_start_cache.dart)** - Get started with caching in 5 minutes  
+- **💡 [Advanced Cache Example](example/cache_example.dart)** - Comprehensive cache usage examples
+
+### Guides
+
 Refer to [LeanStorage Flutter Guide][guide] for more usage information.
 The guide is also available in Chinese ([中文指南][zh]).
 
@@ -99,3 +215,11 @@ The guide is also available in Chinese ([中文指南][zh]).
 For LeanMessage, check out [LeanCloud Official Plugin][plugin].
 
 [plugin]: https://pub.dev/packages/leancloud_official_plugin
+
+### Cache Performance Tips
+
+1. **Use `CachePolicy.cacheElseNetwork` for list pages** - Best balance of speed and data freshness
+2. **Use `CachePolicy.networkElseCache` for critical data** - Ensures accuracy with offline fallback  
+3. **Set appropriate TTL** - 5-10 minutes for lists, 1-2 minutes for user data
+4. **Clear cache on user logout** - Maintain data privacy and accuracy
+5. **Monitor cache hit rates** - Optimize strategies based on usage patterns
