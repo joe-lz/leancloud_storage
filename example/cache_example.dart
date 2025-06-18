@@ -133,6 +133,43 @@ Future<void> advancedCacheExample() async {
   cache.cacheResult(cacheKey, mockData, ttlSeconds: 600);
   print('已缓存模拟数据');
 
+  // 🔥 新功能：演示 find() 方法的自定义缓存时间
+  print('\n--- 🔥 新功能：自定义缓存时间 ---');
+  LCQuery<LCObject> customTtlQuery = LCQuery<LCObject>('Book');
+
+  try {
+    // 短时间缓存：2分钟
+    List<LCObject>? shortCacheBooks = await customTtlQuery.find(
+      cachePolicy: CachePolicy.cacheElseNetwork,
+      cacheTtlSeconds: 120, // 🔥 自定义2分钟缓存
+    );
+    print('✅ find() 自定义缓存时间：${shortCacheBooks?.length ?? 0} 本书（2分钟TTL）');
+
+    // 长时间缓存：30分钟
+    List<LCObject>? longCacheBooks = await customTtlQuery.find(
+      cachePolicy: CachePolicy.cacheElseNetwork,
+      cacheTtlSeconds: 1800, // 🔥 自定义30分钟缓存
+    );
+    print('✅ find() 自定义缓存时间：${longCacheBooks?.length ?? 0} 本书（30分钟TTL）');
+
+    // get() 方法自定义缓存时间
+    LCObject? bookDetail = await customTtlQuery.get(
+      'example-book-id',
+      cachePolicy: CachePolicy.networkElseCache,
+      cacheTtlSeconds: 300, // 🔥 自定义5分钟缓存
+    );
+    print('✅ get() 自定义缓存时间：获取书籍详情（5分钟TTL）');
+
+    // first() 方法自定义缓存时间
+    LCObject? firstBook = await customTtlQuery.first(
+      cachePolicy: CachePolicy.cacheElseNetwork,
+      cacheTtlSeconds: 600, // 🔥 自定义10分钟缓存
+    );
+    print('✅ first() 自定义缓存时间：获取第一本书（10分钟TTL）');
+  } catch (e) {
+    print('💡 自定义缓存时间功能演示（网络错误正常，重点是API支持）');
+  }
+
   // 清除特定缓存
   cache.clearCache(cacheKey);
   print('已清除特定缓存');
@@ -179,26 +216,34 @@ Future<void> statusCacheExample() async {
   print('\n=== 状态查询缓存示例 ===');
 
   try {
-    // 确保用户已登录
-    LCUser? currentUser = await LCUser.getCurrent();
-    if (currentUser == null) {
-      print('用户未登录，跳过状态查询示例');
-      return;
-    }
+    // 🔥 新功能：LCStatusQuery 现在也支持自定义缓存时间
+    LCStatusQuery statusQuery = LCStatusQuery(inboxType: LCStatus.InboxTypeDefault);
+    statusQuery.sinceId = 0;
+    statusQuery.limit(20);
 
-    // 状态查询缓存
-    LCStatusQuery statusQuery = LCStatusQuery();
-    statusQuery.limit(10);
-
-    // 状态信息可以使用缓存提升加载速度
-    print('获取状态列表（缓存优先）...');
-    List<LCStatus> statuses = await statusQuery.find(
+    // 短时间缓存状态查询（1分钟）- 状态更新较频繁
+    print('状态查询（1分钟缓存）...');
+    List<LCStatus>? statuses = await statusQuery.find(
       cachePolicy: CachePolicy.cacheElseNetwork,
+      cacheTtlSeconds: 60, // 🔥 自定义1分钟缓存
     );
-    print('获取到 ${statuses.length} 条状态');
+    print('✅ 获取到 ${statuses?.length ?? 0} 个状态（1分钟TTL）');
+
+    // 网络优先状态查询（2分钟缓存）
+    print('状态查询（网络优先，2分钟缓存）...');
+    List<LCStatus>? networkFirstStatuses = await statusQuery.find(
+      cachePolicy: CachePolicy.networkElseCache,
+      cacheTtlSeconds: 120, // 🔥 自定义2分钟缓存
+    );
+    print('✅ 获取到 ${networkFirstStatuses?.length ?? 0} 个状态（网络优先，2分钟TTL）');
   } catch (e) {
-    print('状态查询错误：$e');
+    print('💡 状态查询需要用户登录，这里展示API支持');
   }
+
+  print('📝 状态查询缓存建议：');
+  print('   • 用户状态流：30-60秒（实时性要求高）');
+  print('   • 历史状态：2-5分钟');
+  print('   • 状态统计：10-30分钟');
 }
 
 /// 性能对比示例

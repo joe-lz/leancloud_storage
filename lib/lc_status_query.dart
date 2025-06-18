@@ -19,7 +19,11 @@ class LCStatusQuery extends LCQuery<LCStatus> {
   }
 
   /// See [LCQuery.find].
-  Future<List<LCStatus>> find({CachePolicy cachePolicy = CachePolicy.onlyNetwork}) async {
+  @override
+  Future<List<LCStatus>?> find({
+    CachePolicy cachePolicy = CachePolicy.onlyNetwork,
+    int? cacheTtlSeconds,
+  }) async {
     LCUser? user = await LCUser.getCurrent();
     if (user == null) {
       throw new ArgumentError.notNull('current user');
@@ -44,7 +48,7 @@ class LCStatusQuery extends LCQuery<LCStatus> {
 
     // 如果有查询缓存，尝试使用缓存策略
     if (LeanCloud._queryCache != null && cachePolicy != CachePolicy.onlyNetwork) {
-      return await _findWithCache(params, cachePolicy);
+      return await _findWithCache(params, cachePolicy, cacheTtlSeconds);
     }
 
     // 默认网络查询
@@ -52,7 +56,7 @@ class LCStatusQuery extends LCQuery<LCStatus> {
     return _parseStatusResults(response);
   }
 
-  Future<List<LCStatus>> _findWithCache(Map<String, dynamic> params, CachePolicy cachePolicy) async {
+  Future<List<LCStatus>> _findWithCache(Map<String, dynamic> params, CachePolicy cachePolicy, int? cacheTtlSeconds) async {
     final cache = LeanCloud._queryCache!;
     final cacheKey = cache.generateCacheKey('_Status', params);
 
@@ -69,18 +73,18 @@ class LCStatusQuery extends LCQuery<LCStatus> {
           final cachedData = cache.getCachedResult(cacheKey);
           return _parseStatusResultsFromCache(cachedData);
         }
-        return await _fetchStatusFromNetworkAndCache(params, cacheKey, cache);
+        return await _fetchStatusFromNetworkAndCache(params, cacheKey, cache, cacheTtlSeconds);
 
       case CachePolicy.cacheFirst:
         if (cache.hasCachedResult(cacheKey)) {
           final cachedData = cache.getCachedResult(cacheKey);
           return _parseStatusResultsFromCache(cachedData);
         }
-        return await _fetchStatusFromNetworkAndCache(params, cacheKey, cache);
+        return await _fetchStatusFromNetworkAndCache(params, cacheKey, cache, cacheTtlSeconds);
 
       case CachePolicy.networkElseCache:
         try {
-          return await _fetchStatusFromNetworkAndCache(params, cacheKey, cache);
+          return await _fetchStatusFromNetworkAndCache(params, cacheKey, cache, cacheTtlSeconds);
         } catch (error) {
           if (cache.hasCachedResult(cacheKey)) {
             final cachedData = cache.getCachedResult(cacheKey);
@@ -90,15 +94,15 @@ class LCStatusQuery extends LCQuery<LCStatus> {
         }
 
       default:
-        return await _fetchStatusFromNetworkAndCache(params, cacheKey, cache);
+        return await _fetchStatusFromNetworkAndCache(params, cacheKey, cache, cacheTtlSeconds);
     }
   }
 
-  Future<List<LCStatus>> _fetchStatusFromNetworkAndCache(Map<String, dynamic> params, String cacheKey, LCQueryCache cache) async {
+  Future<List<LCStatus>> _fetchStatusFromNetworkAndCache(Map<String, dynamic> params, String cacheKey, LCQueryCache cache, int? cacheTtlSeconds) async {
     Map response = await LeanCloud._httpClient.get('subscribe/statuses', queryParams: params);
 
-    // 缓存结果
-    cache.cacheResult(cacheKey, response['results']);
+    // 缓存结果，使用自定义TTL
+    cache.cacheResult(cacheKey, response['results'], ttlSeconds: cacheTtlSeconds);
 
     return _parseStatusResults(response);
   }

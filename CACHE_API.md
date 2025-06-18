@@ -26,6 +26,37 @@ List<LCObject>? products = await query.find(
 );
 ```
 
+### 3. 🔥 自定义缓存时间 (新功能)
+
+```dart
+LCQuery<LCObject> query = LCQuery<LCObject>('Product');
+
+// find() 方法自定义缓存时间
+List<LCObject>? products = await query.find(
+  cachePolicy: CachePolicy.cacheElseNetwork,
+  cacheTtlSeconds: 600, // 🔥 自定义10分钟缓存
+);
+
+// get() 方法自定义缓存时间
+LCObject? product = await query.get(
+  'product-id',
+  cachePolicy: CachePolicy.networkElseCache,
+  cacheTtlSeconds: 300, // 🔥 自定义5分钟缓存
+);
+
+// first() 方法自定义缓存时间
+LCObject? firstProduct = await query.first(
+  cachePolicy: CachePolicy.cacheElseNetwork,
+  cacheTtlSeconds: 120, // 🔥 自定义2分钟缓存
+);
+```
+
+**TTL 设置建议：**
+- 实时数据：30-120秒
+- 一般列表：300-600秒（5-10分钟）
+- 静态配置：1800-7200秒（30分钟-2小时）
+- 很少变化：86400秒+（1天以上）
+
 ## 缓存策略 (CachePolicy)
 
 ### CachePolicy.onlyNetwork (默认)

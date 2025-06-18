@@ -139,6 +139,30 @@ List<LCObject> reliableUsers = await query.find(
 List<LCObject> freshUsers = await query.find(
   cachePolicy: CachePolicy.cacheFirst
 );
+
+// 🔥 NEW: Custom cache TTL
+List<LCObject> shortCacheUsers = await query.find(
+  cachePolicy: CachePolicy.cacheElseNetwork,
+  cacheTtlSeconds: 120 // Custom 2-minute cache
+);
+
+List<LCObject> longCacheUsers = await query.find(
+  cachePolicy: CachePolicy.cacheElseNetwork,
+  cacheTtlSeconds: 3600 // Custom 1-hour cache
+);
+
+// Custom TTL for get() method
+LCObject? user = await query.get(
+  'user-id',
+  cachePolicy: CachePolicy.networkElseCache,
+  cacheTtlSeconds: 300 // Custom 5-minute cache
+);
+
+// Custom TTL for first() method  
+LCObject? firstUser = await query.first(
+  cachePolicy: CachePolicy.cacheElseNetwork,
+  cacheTtlSeconds: 600 // Custom 10-minute cache
+);
 ```
 
 #### Cache Management

@@ -24,6 +24,9 @@ void main() async {
   // 🔄 实用场景：离线可用查询
   await offlineAvailableExample();
 
+  // ⏰ 新功能：自定义缓存时间
+  await customCacheTtlExample();
+
   print('\n✅ 快速入门完成！');
 }
 
@@ -97,6 +100,61 @@ Future<void> offlineAvailableExample() async {
   }
 }
 
+/// ⏰ 自定义缓存时间示例
+Future<void> customCacheTtlExample() async {
+  print('\n--- ⏰ 自定义缓存时间示例 ---');
+
+  LCQuery<LCObject> query = LCQuery<LCObject>('Product');
+  query.whereEqualTo('category', 'electronics');
+  query.limit(10);
+
+  // 场景1：短时间缓存（30秒）- 适合实时性要求高的数据
+  print('短时间缓存（30秒）...');
+  List<LCObject>? shortCacheProducts = await query.find(
+    cachePolicy: CachePolicy.cacheElseNetwork,
+    cacheTtlSeconds: 30, // 🔥 自定义30秒缓存
+  );
+  print('📦 获取到 ${shortCacheProducts?.length ?? 0} 个产品（30秒缓存）');
+
+  // 场景2：中等时间缓存（10分钟）- 适合一般列表数据
+  print('中等时间缓存（10分钟）...');
+  List<LCObject>? mediumCacheProducts = await query.find(
+    cachePolicy: CachePolicy.cacheElseNetwork,
+    cacheTtlSeconds: 600, // 🔥 自定义10分钟缓存
+  );
+  print('📦 获取到 ${mediumCacheProducts?.length ?? 0} 个产品（10分钟缓存）');
+
+  // 场景3：长时间缓存（1小时）- 适合相对静态的数据
+  print('长时间缓存（1小时）...');
+  LCQuery<LCObject> configQuery = LCQuery<LCObject>('AppConfig');
+  List<LCObject>? configData = await configQuery.find(
+    cachePolicy: CachePolicy.cacheElseNetwork,
+    cacheTtlSeconds: 3600, // 🔥 自定义1小时缓存
+  );
+  print('⚙️ 获取到 ${configData?.length ?? 0} 个配置项（1小时缓存）');
+
+  // 场景4：获取单个对象（详情页面）
+  print('获取单个产品详情（5分钟缓存）...');
+  LCQuery<LCObject> detailQuery = LCQuery<LCObject>('Product');
+  try {
+    LCObject? productDetail = await detailQuery.get(
+      'example-product-id',
+      cachePolicy: CachePolicy.networkElseCache,
+      cacheTtlSeconds: 300, // 🔥 自定义5分钟缓存
+    );
+    print('📱 获取到产品详情：${productDetail?['name'] ?? '示例产品'}（5分钟缓存）');
+  } catch (e) {
+    print('💡 提示：这是示例ID，实际使用时请替换为真实的产品ID');
+  }
+
+  print('\n💡 使用建议：');
+  print('   • 实时数据（股价、聊天）：30秒 - 2分钟');
+  print('   • 一般列表数据：5-10分钟');
+  print('   • 用户资料：1-2分钟');
+  print('   • 静态配置：30分钟 - 2小时');
+  print('   • 很少变化的数据：1天+');
+}
+
 /// 📚 实际项目中的使用模式
 class ProductService {
   /// 商品列表页面（推荐使用缓存优先）
@@ -107,9 +165,10 @@ class ProductService {
     }
     query.limit(20);
 
-    // ⚡ 快速响应用户，后台更新数据
+    // ⚡ 快速响应用户，10分钟缓存适合商品列表
     return await query.find(
       cachePolicy: CachePolicy.cacheElseNetwork,
+      cacheTtlSeconds: 600, // 🔥 自定义10分钟缓存
     );
   }
 
@@ -117,16 +176,41 @@ class ProductService {
   static Future<LCObject?> getProductDetail(String productId) async {
     LCQuery<LCObject> query = LCQuery<LCObject>('Product');
 
-    // 🔄 确保数据准确性，支持离线查看
-    return await query.get(productId);
+    // 🔄 确保数据准确性，支持离线查看，5分钟缓存
+    return await query.get(
+      productId,
+      cachePolicy: CachePolicy.networkElseCache,
+      cacheTtlSeconds: 300, // 🔥 自定义5分钟缓存
+    );
   }
 
   /// 购物车页面（推荐网络优先）
   static Future<List<LCObject>?> getCartItems() async {
     LCQuery<LCObject> query = LCQuery<LCObject>('CartItem');
-    // 购物车数据需要实时性
+    // 购物车数据需要实时性，只缓存2分钟
     return await query.find(
       cachePolicy: CachePolicy.networkElseCache,
+      cacheTtlSeconds: 120, // 🔥 自定义2分钟缓存
+    );
+  }
+
+  /// 用户资料（实时性要求高）
+  static Future<List<LCObject>?> getUserProfile() async {
+    LCQuery<LCObject> query = LCQuery<LCObject>('UserProfile');
+    // 用户资料变化较频繁，缓存1分钟
+    return await query.find(
+      cachePolicy: CachePolicy.networkElseCache,
+      cacheTtlSeconds: 60, // 🔥 自定义1分钟缓存
+    );
+  }
+
+  /// 应用配置（很少变化）
+  static Future<List<LCObject>?> getAppConfig() async {
+    LCQuery<LCObject> query = LCQuery<LCObject>('AppConfig');
+    // 应用配置很少变化，可以长时间缓存
+    return await query.find(
+      cachePolicy: CachePolicy.cacheElseNetwork,
+      cacheTtlSeconds: 3600, // 🔥 自定义1小时缓存
     );
   }
 }

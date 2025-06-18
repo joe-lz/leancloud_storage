@@ -1,3 +1,50 @@
+# CHANGELOG
+
+## 🔥 [NEW] 自定义缓存时间功能 (2025年6月18日)
+
+### 新增功能
+✅ **find() 方法支持自定义缓存时间**
+- 新增 `cacheTtlSeconds` 参数，可为每个查询自定义缓存时间
+- 保持向后兼容，原有API不受影响
+
+✅ **get() 方法全面支持缓存**
+- 新增 `cachePolicy` 和 `cacheTtlSeconds` 参数
+- 支持所有缓存策略：onlyCache、cacheElseNetwork、networkElseCache、cacheFirst
+- 实现智能缓存逻辑和自动降级
+
+✅ **first() 方法支持自定义缓存时间**
+- 新增 `cachePolicy` 和 `cacheTtlSeconds` 参数
+- 与 find() 方法保持一致的API设计
+
+### 使用示例
+```dart
+// find() 自定义缓存时间
+List<LCObject>? products = await query.find(
+  cachePolicy: CachePolicy.cacheElseNetwork,
+  cacheTtlSeconds: 600, // 10分钟自定义缓存
+);
+
+// get() 方法缓存支持
+LCObject? product = await query.get(
+  'product-id',
+  cachePolicy: CachePolicy.networkElseCache,
+  cacheTtlSeconds: 300, // 5分钟自定义缓存
+);
+
+// first() 自定义缓存时间
+LCObject? firstProduct = await query.first(
+  cachePolicy: CachePolicy.cacheElseNetwork,
+  cacheTtlSeconds: 120, // 2分钟自定义缓存
+);
+```
+
+### 向后兼容
+- 所有原有API保持不变
+- 新参数为可选参数，默认行为不受影响
+- 无需修改现有代码即可升级
+
+---
+
 ## 🎉 完整的缓存系统修改总结
 1. 扩展了 CachePolicy 枚举 (lc_query_cache.dart)
 添加了 4 种新的缓存策略：

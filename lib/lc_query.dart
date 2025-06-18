@@ -212,32 +212,109 @@ class LCQuery<T extends LCObject> {
   }
 
   /// Constructs a [LCObject] whose [objectId] is already known.
-  Future<T?> get(String objectId) async {
+  /// Retrieves a single [LCObject] by [objectId], respecting [cachePolicy].
+  ///
+  /// [objectId] - The objectId of the object to retrieve
+  /// [cachePolicy] - The cache policy to use for this query
+  /// [cacheTtlSeconds] - Custom cache TTL in seconds. If null, uses default TTL (5 minutes)
+  Future<T?> get(
+    String objectId, {
+    CachePolicy cachePolicy = CachePolicy.onlyNetwork,
+    int? cacheTtlSeconds,
+  }) async {
     if (isNullOrEmpty(objectId)) {
       throw new ArgumentError.notNull('objectId');
     }
+
     String path = "classes/$className/$objectId";
     Map<String, dynamic>? queryParams;
     String? includes = condition._buildIncludes();
     if (includes != null) {
       queryParams = {"include": includes};
     }
+
+    // 如果有查询缓存，尝试使用缓存策略
+    if (LeanCloud._queryCache != null && cachePolicy != CachePolicy.onlyNetwork) {
+      return await _getWithCache(path, queryParams ?? {}, objectId, cachePolicy, cacheTtlSeconds);
+    }
+
+    // 默认网络查询
     Map<String, dynamic> response = await LeanCloud._httpClient.get(path, queryParams: queryParams);
     return _decodeLCObject(response);
   }
 
-  /// Retrieves a list of [LCObject]s matching this query, respecting [cachePolicy].
-  Future<List<T>?> find({CachePolicy cachePolicy = CachePolicy.onlyNetwork}) async {
-    return _fetch(cachePolicy);
+  Future<T?> _getWithCache(String path, Map<String, dynamic> params, String objectId, CachePolicy cachePolicy, int? cacheTtlSeconds) async {
+    final cache = LeanCloud._queryCache!;
+    final cacheKey = cache.generateCacheKey(className!, {...params, 'objectId': objectId});
+
+    switch (cachePolicy) {
+      case CachePolicy.onlyCache:
+        // 仅使用缓存
+        final cachedData = cache.getCachedResult(cacheKey);
+        if (cachedData != null) {
+          return _decodeLCObject(cachedData);
+        }
+        throw LCException(404, 'No cached data available');
+
+      case CachePolicy.cacheElseNetwork:
+        // 优先使用缓存，缓存未命中时查询网络
+        if (cache.hasCachedResult(cacheKey)) {
+          final cachedData = cache.getCachedResult(cacheKey);
+          return _decodeLCObject(cachedData);
+        }
+        return await _getFromNetworkAndCache(path, params, cacheKey, cache, cacheTtlSeconds);
+
+      case CachePolicy.cacheFirst:
+        // 智能缓存优先（考虑过期时间）
+        if (cache.hasCachedResult(cacheKey)) {
+          final cachedData = cache.getCachedResult(cacheKey);
+          return _decodeLCObject(cachedData);
+        }
+        return await _getFromNetworkAndCache(path, params, cacheKey, cache, cacheTtlSeconds);
+
+      case CachePolicy.networkElseCache:
+      default:
+        // 网络优先，失败时使用缓存
+        return await _getFromNetworkAndCache(path, params, cacheKey, cache, cacheTtlSeconds);
+    }
   }
 
-  Future<List<T>> _fetch(CachePolicy cachePolicy) async {
+  Future<T?> _getFromNetworkAndCache(String path, Map<String, dynamic> params, String cacheKey, LCQueryCache cache, int? cacheTtlSeconds) async {
+    try {
+      Map<String, dynamic> response = await LeanCloud._httpClient.get(path, queryParams: params.isNotEmpty ? params : null);
+
+      // 缓存结果，使用自定义TTL
+      cache.cacheResult(cacheKey, response, ttlSeconds: cacheTtlSeconds);
+
+      return _decodeLCObject(response);
+    } catch (error) {
+      // 网络请求失败，尝试使用缓存
+      if (cache.hasCachedResult(cacheKey)) {
+        final cachedData = cache.getCachedResult(cacheKey);
+        return _decodeLCObject(cachedData);
+      }
+      rethrow;
+    }
+  }
+
+  /// Retrieves a list of [LCObject]s matching this query, respecting [cachePolicy].
+  ///
+  /// [cachePolicy] - The cache policy to use for this query
+  /// [cacheTtlSeconds] - Custom cache TTL in seconds. If null, uses default TTL (5 minutes)
+  Future<List<T>?> find({
+    CachePolicy cachePolicy = CachePolicy.onlyNetwork,
+    int? cacheTtlSeconds,
+  }) async {
+    return _fetch(cachePolicy, cacheTtlSeconds);
+  }
+
+  Future<List<T>> _fetch(CachePolicy cachePolicy, [int? cacheTtlSeconds]) async {
     String path = 'classes/$className';
     Map<String, dynamic> params = _buildParams();
 
     // 如果有查询缓存，尝试使用缓存策略
     if (LeanCloud._queryCache != null) {
-      return await _fetchWithCache(path, params, cachePolicy);
+      return await _fetchWithCache(path, params, cachePolicy, cacheTtlSeconds);
     }
 
     // 默认网络查询
@@ -251,7 +328,7 @@ class LCQuery<T extends LCObject> {
     return list;
   }
 
-  Future<List<T>> _fetchWithCache(String path, Map<String, dynamic> params, CachePolicy cachePolicy) async {
+  Future<List<T>> _fetchWithCache(String path, Map<String, dynamic> params, CachePolicy cachePolicy, [int? cacheTtlSeconds]) async {
     final cache = LeanCloud._queryCache!;
     final cacheKey = cache.generateCacheKey(className!, params);
 
@@ -271,7 +348,7 @@ class LCQuery<T extends LCObject> {
           return _parseResultsFromCache(cachedData);
         }
         // 缓存未命中，查询网络并缓存结果
-        return await _fetchFromNetworkAndCache(path, params, cacheKey, cache);
+        return await _fetchFromNetworkAndCache(path, params, cacheKey, cache, cacheTtlSeconds);
 
       case CachePolicy.cacheFirst:
         // 智能缓存优先（考虑过期时间）
@@ -279,7 +356,7 @@ class LCQuery<T extends LCObject> {
           final cachedData = cache.getCachedResult(cacheKey);
           return _parseResultsFromCache(cachedData);
         }
-        return await _fetchFromNetworkAndCache(path, params, cacheKey, cache);
+        return await _fetchFromNetworkAndCache(path, params, cacheKey, cache, cacheTtlSeconds);
 
       case CachePolicy.cacheAndNetwork:
         // 缓存和网络并行
@@ -290,7 +367,7 @@ class LCQuery<T extends LCObject> {
         }
 
         // 异步更新网络数据
-        _fetchFromNetworkAndCache(path, params, cacheKey, cache).then((networkResults) {
+        _fetchFromNetworkAndCache(path, params, cacheKey, cache, cacheTtlSeconds).then((networkResults) {
           // 网络数据获取成功，可以触发回调通知UI更新
         }).catchError((error) {
           // 网络请求失败，但缓存数据仍然有效
@@ -300,20 +377,20 @@ class LCQuery<T extends LCObject> {
           return cachedResults;
         }
         // 如果没有缓存，等待网络请求
-        return await _fetchFromNetworkAndCache(path, params, cacheKey, cache);
+        return await _fetchFromNetworkAndCache(path, params, cacheKey, cache, cacheTtlSeconds);
 
       default:
         // 默认策略：networkElseCache 或 onlyNetwork
-        return await _fetchFromNetworkAndCache(path, params, cacheKey, cache);
+        return await _fetchFromNetworkAndCache(path, params, cacheKey, cache, cacheTtlSeconds);
     }
   }
 
-  Future<List<T>> _fetchFromNetworkAndCache(String path, Map<String, dynamic> params, String cacheKey, LCQueryCache cache) async {
+  Future<List<T>> _fetchFromNetworkAndCache(String path, Map<String, dynamic> params, String cacheKey, LCQueryCache cache, [int? cacheTtlSeconds]) async {
     try {
       Map response = await LeanCloud._httpClient.get(path, queryParams: params, maxCacheAge: maxCacheAge);
 
-      // 缓存结果
-      cache.cacheResult(cacheKey, response['results']);
+      // 缓存结果，使用自定义TTL
+      cache.cacheResult(cacheKey, response['results'], ttlSeconds: cacheTtlSeconds);
 
       List results = response['results'];
       List<T> list = [];
@@ -343,9 +420,18 @@ class LCQuery<T extends LCObject> {
   }
 
   /// Retrieves at most one [LCObject] matching this query.
-  Future<T?> first() async {
+  ///
+  /// [cachePolicy] - The cache policy to use for this query
+  /// [cacheTtlSeconds] - Custom cache TTL in seconds. If null, uses default TTL (5 minutes)
+  Future<T?> first({
+    CachePolicy cachePolicy = CachePolicy.onlyNetwork,
+    int? cacheTtlSeconds,
+  }) async {
     limit(1);
-    List<T>? results = await find();
+    List<T>? results = await find(
+      cachePolicy: cachePolicy,
+      cacheTtlSeconds: cacheTtlSeconds,
+    );
     if (results != null && results.length > 0) {
       return results.first;
     }
