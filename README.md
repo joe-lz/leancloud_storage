@@ -140,7 +140,7 @@ List<LCObject> freshUsers = await query.find(
   cachePolicy: CachePolicy.cacheFirst
 );
 
-// 🔥 NEW: Custom cache TTL
+// 🔥 NEW: Custom cache TTL for find() method
 List<LCObject> shortCacheUsers = await query.find(
   cachePolicy: CachePolicy.cacheElseNetwork,
   cacheTtlSeconds: 120 // Custom 2-minute cache
@@ -151,7 +151,18 @@ List<LCObject> longCacheUsers = await query.find(
   cacheTtlSeconds: 3600 // Custom 1-hour cache
 );
 
-// Custom TTL for get() method
+// 🔥 NEW: Custom cache TTL for first() method  
+LCObject? firstUser = await query.first(
+  cachePolicy: CachePolicy.cacheElseNetwork,
+  cacheTtlSeconds: 600 // Custom 10-minute cache
+);
+
+LCObject? smartCacheUser = await query.first(
+  cachePolicy: CachePolicy.cacheFirst,
+  cacheTtlSeconds: 300 // Custom 5-minute cache
+);
+
+// 🔥 NEW: Custom cache TTL for get() method
 LCObject? user = await query.get(
   'user-id',
   cachePolicy: CachePolicy.networkElseCache,

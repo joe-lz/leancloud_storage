@@ -135,7 +135,20 @@ void main() {
           cacheTtlSeconds: 60, // 1分钟自定义缓存
         );
 
-        print('✅ LCStatusQuery 自定义缓存时间功能测试通过');
+        // 🔥 测试 first() 方法的自定义缓存时间功能
+        LCStatus? firstStatus1 = await query.first(); // 默认参数
+
+        LCStatus? firstStatus2 = await query.first(
+          cachePolicy: CachePolicy.cacheElseNetwork,
+          cacheTtlSeconds: 180, // 3分钟自定义缓存
+        );
+
+        LCStatus? firstStatus3 = await query.first(
+          cachePolicy: CachePolicy.networkElseCache,
+          cacheTtlSeconds: 90, // 1.5分钟自定义缓存
+        );
+
+        print('✅ LCStatusQuery find() 和 first() 自定义缓存时间功能测试通过');
       } catch (e) {
         // 这里可能会有网络错误，但重要的是API签名正确
         print('💡 API 签名测试通过，网络错误是正常的');

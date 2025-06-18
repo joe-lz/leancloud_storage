@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:leancloud_storage/leancloud.dart';
+
 import 'utils.dart';
 
 void main() {
@@ -60,8 +60,7 @@ void main() {
       for (int i = 0; i + 1 < results.length; i++) {
         LCObject a1 = results[i];
         LCObject a2 = results[i + 1];
-        assert(a1['balance'] < a2['balance'] ||
-            a1.createdAt!.compareTo(a2.createdAt!) >= 0);
+        assert(a1['balance'] < a2['balance'] || a1.createdAt!.compareTo(a2.createdAt!) >= 0);
       }
     });
 
@@ -92,6 +91,17 @@ void main() {
       LCQuery<LCObject> query = new LCQuery<LCObject>('Account');
       LCObject account = (await query.first())!;
       assert(account.objectId != null);
+
+      // 🔥 测试 first() 方法的新缓存参数
+      LCObject? cachedAccount = await query.first(
+        cachePolicy: CachePolicy.cacheElseNetwork,
+        cacheTtlSeconds: 300, // 5分钟自定义缓存
+      );
+
+      LCObject? networkFirstAccount = await query.first(
+        cachePolicy: CachePolicy.networkElseCache,
+        cacheTtlSeconds: 120, // 2分钟自定义缓存
+      );
     });
 
     test('greater query', () async {

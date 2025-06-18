@@ -24,10 +24,31 @@ List<LCObject>? products = await query.find(
   cacheTtlSeconds: 600, // 10分钟自定义缓存
 );
 
+// first() 自定义缓存时间
+LCObject? firstProduct = await query.first(
+  cachePolicy: CachePolicy.cacheElseNetwork,
+  cacheTtlSeconds: 300, // 5分钟自定义缓存
+);
+
 // get() 方法缓存支持
 LCObject? product = await query.get(
   'product-id',
   cachePolicy: CachePolicy.networkElseCache,
+  cacheTtlSeconds: 120, // 2分钟自定义缓存
+);
+
+// LCStatusQuery 也完全支持
+LCStatusQuery statusQuery = LCStatusQuery();
+List<LCStatus>? statuses = await statusQuery.find(
+  cachePolicy: CachePolicy.cacheElseNetwork,
+  cacheTtlSeconds: 60, // 1分钟自定义缓存
+);
+
+LCStatus? firstStatus = await statusQuery.first(
+  cachePolicy: CachePolicy.networkElseCache,
+  cacheTtlSeconds: 90, // 1.5分钟自定义缓存
+);
+```
   cacheTtlSeconds: 300, // 5分钟自定义缓存
 );
 
